@@ -30,6 +30,7 @@ public class Config {
 
     /**
      * 黑名单前置路径
+     * blackPathPre参数是 通过 Spring Cloud Gateway 中的 过滤器参数（filter args） 直接传递给 TokenValidate 过滤器。
      */
     private List<String> blackPathPre;
 }

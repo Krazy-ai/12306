@@ -99,6 +99,7 @@ public final class TicketAvailabilityTokenBucket {
         String tokenBucketHashKey = TICKET_AVAILABILITY_TOKEN_BUCKET + requestParam.getTrainId();
         Boolean hasKey = distributedCache.hasKey(tokenBucketHashKey);
         if (!hasKey) {
+            // 为了避免出现并发读写问题，所以这里通过分布式锁锁定
             RLock lock = redissonClient.getLock(String.format(LOCK_TICKET_AVAILABILITY_TOKEN_BUCKET, requestParam.getTrainId()));
             if (!lock.tryLock()) {
                 throw new ServiceException("购票异常，请稍候再试");

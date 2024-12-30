@@ -58,6 +58,7 @@ public final class AliPayCallbackHandler extends AbstractPayCallbackHandler impl
         return PayChannelEnum.ALI_PAY.name();
     }
 
+    @Override
     public void execute(PayCallbackRequest requestParam) {
         callback(requestParam);
     }

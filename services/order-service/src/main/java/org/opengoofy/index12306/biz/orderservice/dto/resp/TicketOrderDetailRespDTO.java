@@ -82,6 +82,7 @@ public class TicketOrderDetailRespDTO {
 
     /**
      * 乘车人订单详情
+     * TODO 注解啥意思
      */
     @Disassemble
     private List<TicketOrderPassengerDetailRespDTO> passengerDetails;

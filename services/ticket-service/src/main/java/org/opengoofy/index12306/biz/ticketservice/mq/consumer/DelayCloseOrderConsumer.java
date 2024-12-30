@@ -88,6 +88,7 @@ public class DelayCloseOrderConsumer implements RocketMQListener<MessageWrapper<
         String orderSn = delayCloseOrderEvent.getOrderSn();
         Result<Boolean> closedTickOrder;
         try {
+            //TODO 这里要远程调用吗？
             closedTickOrder = ticketOrderRemoteService.closeTickOrder(new CancelTicketOrderReqDTO(orderSn));
         } catch (Throwable ex) {
             log.error("[延迟关闭订单] 订单号：{} 远程调用订单服务失败", orderSn, ex);
@@ -108,6 +109,7 @@ public class DelayCloseOrderConsumer implements RocketMQListener<MessageWrapper<
                 log.error("[延迟关闭订单] 订单号：{} 回滚列车DB座位状态失败", orderSn, ex);
                 throw ex;
             }
+            //TODO 没保证数据一致性，why
             try {
                 StringRedisTemplate stringRedisTemplate = (StringRedisTemplate) distributedCache.getInstance();
                 Map<Integer, List<TrainPurchaseTicketRespDTO>> seatTypeMap = trainPurchaseTicketResults.stream()

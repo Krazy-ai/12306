@@ -396,6 +396,7 @@ public class TrainSecondClassPurchaseTicketHandler extends AbstractTrainPurchase
                     }
                 }
             }
+            //深拷贝，当前车厢不足则到下一个车厢继续匹配
             int[][] actualSeatsTranscript = deepCopy(actualSeats);
             List<int[][]> actualSelects = new ArrayList<>();
             List<List<PurchaseTicketPassengerDetailDTO>> splitPassengerSeatDetails = ListUtil.split(passengerSeatDetails, 3);

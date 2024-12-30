@@ -63,8 +63,10 @@ public final class IdempotentSpELByMQExecuteHandler extends AbstractIdempotentEx
     public void handler(IdempotentParamWrapper wrapper) {
         String uniqueKey = wrapper.getIdempotent().uniqueKeyPrefix() + wrapper.getLockKey();
         String absentAndGet = this.setIfAbsentAndGet(uniqueKey, IdempotentMQConsumeStatusEnum.CONSUMING.getCode(), TIMEOUT, TimeUnit.SECONDS);
-
+        //若不为null,则返回值
         if (Objects.nonNull(absentAndGet)) {
+            //absentAndGet如果是CONSUMING(0)，error为true,表示消息还在处理
+            //absentAndGet如果是CONSUMED(1)，error为false，表示消息已经处理完成
             boolean error = IdempotentMQConsumeStatusEnum.isError(absentAndGet);
             LogUtil.getLog(wrapper.getJoinPoint()).warn("[{}] MQ repeated consumption, {}.", uniqueKey, error ? "Wait for the client to delay consumption" : "Status is completed");
             throw new RepeatConsumptionException(error);
@@ -79,9 +81,14 @@ public final class IdempotentSpELByMQExecuteHandler extends AbstractIdempotentEx
         redisScript.setResultType(String.class);
 
         long millis = timeUnit.toMillis(timeout);
+        //若key存在返回其值，若key不存在则设置key并返回null
         return ((StringRedisTemplate) distributedCache.getInstance()).execute(redisScript, List.of(key), value, String.valueOf(millis));
     }
 
+    /**
+     * 客户端消费存在异常，对应上面 absentAndGet是CONSUMING(0) 的情况
+     * 需要删除幂等标识方便下次 RocketMQ 再次通过重试队列投递
+     */
     @Override
     public void exceptionProcessing() {
         IdempotentParamWrapper wrapper = (IdempotentParamWrapper) IdempotentContext.getKey(WRAPPER);
@@ -96,6 +103,9 @@ public final class IdempotentSpELByMQExecuteHandler extends AbstractIdempotentEx
         }
     }
 
+    /**
+     * 正常业务逻辑执行成功后，会调用 instance.postProcessing()， 将幂等标识的完成状态设置为已完成。
+     */
     @Override
     public void postProcessing() {
         IdempotentParamWrapper wrapper = (IdempotentParamWrapper) IdempotentContext.getKey(WRAPPER);

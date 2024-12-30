@@ -64,17 +64,21 @@ public class TrainTicketQueryParamVerifyChainFilter implements TrainTicketQueryC
     public void handler(TicketPageQueryReqDTO requestParam) {
         StringRedisTemplate stringRedisTemplate = (StringRedisTemplate) distributedCache.getInstance();
         HashOperations<String, Object, Object> hashOperations = stringRedisTemplate.opsForHash();
+        // 验证出发地和目的地是否存在
         List<Object> actualExistList = hashOperations.multiGet(
                 QUERY_ALL_REGION_LIST,
                 ListUtil.toList(requestParam.getFromStation(), requestParam.getToStation())
         );
+        // 这里有个毕竟坑的地方，就算为空，也会返回数据，所以我们通过 filter 判断对象是否为空
         long emptyCount = actualExistList.stream().filter(Objects::isNull).count();
         if (emptyCount == 0L) {
             return;
         }
+        // FLAG = true 代表已经加载过一次，此时还是空，证明说数据库也没有这两个站点信息，抛异常
         if (emptyCount == 1L || (emptyCount == 2L && CACHE_DATA_ISNULL_AND_LOAD_FLAG && distributedCache.hasKey(QUERY_ALL_REGION_LIST))) {
             throw new ClientException("出发地或目的地不存在");
         }
+        // 如果FLAG=false代表有可能缓存没有数据，但数据库可能有，此时向下查询数据库
         RLock lock = redissonClient.getLock(LOCK_QUERY_ALL_REGION_LIST);
         lock.lock();
         try {

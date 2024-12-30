@@ -37,6 +37,7 @@ public class IdempotentTokenController {
      * 请求申请Token
      */
     @GetMapping("/token")
+    //TODO 什么时候调用这个？
     public Result<String> createToken() {
         return Results.success(idempotentTokenService.createToken());
     }

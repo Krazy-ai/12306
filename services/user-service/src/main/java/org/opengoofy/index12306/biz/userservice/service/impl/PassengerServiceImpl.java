@@ -90,6 +90,7 @@ public class PassengerServiceImpl implements PassengerService {
 
     @Override
     public List<PassengerActualRespDTO> listPassengerQueryByIds(String username, List<Long> ids) {
+        //todo 干啥用的
         String actualUserPassengerListStr = getActualUserPassengerListStr(username);
         if (StrUtil.isEmpty(actualUserPassengerListStr)) {
             return null;
@@ -160,7 +161,7 @@ public class PassengerServiceImpl implements PassengerService {
             LambdaUpdateWrapper<PassengerDO> deleteWrapper = Wrappers.lambdaUpdate(PassengerDO.class)
                     .eq(PassengerDO::getUsername, username)
                     .eq(PassengerDO::getId, requestParam.getId());
-            // 逻辑删除，修改数据库表记录 del_flag
+            // TODO 怎么实现的？     逻辑删除，修改数据库表记录 del_flag
             int deleted = passengerMapper.delete(deleteWrapper);
             if (!SqlHelper.retBool(deleted)) {
                 throw new ServiceException(String.format("[%s] 删除乘车人失败", username));

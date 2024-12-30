@@ -40,6 +40,7 @@ public abstract class AbstractIdempotentExecuteHandler implements IdempotentExec
      * @param joinPoint  AOP 方法处理
      * @param idempotent 幂等注解
      */
+    @Override
     public void execute(ProceedingJoinPoint joinPoint, Idempotent idempotent) {
         // 模板方法模式：构建幂等参数包装器
         IdempotentParamWrapper idempotentParamWrapper = buildWrapper(joinPoint).setIdempotent(idempotent);

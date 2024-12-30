@@ -42,6 +42,7 @@ import java.util.Objects;
 public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFactory<Config> {
 
     public TokenValidateGatewayFilterFactory() {
+        // 将配置类绑定到工厂
         super(Config.class);
     }
 
@@ -50,6 +51,10 @@ public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFact
      */
     public static final String DELETION_PATH = "/api/user-service/deletion";
 
+    /**
+     * 在 TokenValidateGatewayFilterFactory 中，Config 会作为构造参数传递给 apply 方法
+     * 因此当路由配置被加载时，blackPathPre 会被自动填充到 Config 类中。
+     */
     @Override
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {

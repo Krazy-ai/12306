@@ -197,6 +197,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
             try {
                 regionTrainStationAllMap = stringRedisTemplate.opsForHash().entries(buildRegionTrainStationHashKey);
                 if (MapUtil.isEmpty(regionTrainStationAllMap)) {
+                    // 加载数据库列车相关信息，并构建出一趟列车详细记录
                     LambdaQueryWrapper<TrainStationRelationDO> queryWrapper = Wrappers.lambdaQuery(TrainStationRelationDO.class)
                             .eq(TrainStationRelationDO::getStartRegion, stationDetails.get(0))
                             .eq(TrainStationRelationDO::getEndRegion, stationDetails.get(1));
@@ -223,7 +224,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                         if (StrUtil.isNotBlank(trainDO.getTrainTag())) {
                             result.setTrainTags(StrUtil.split(trainDO.getTrainTag(), ","));
                         }
-                        long betweenDay = cn.hutool.core.date.DateUtil.betweenDay(each.getDepartureTime(), each.getArrivalTime(), false);
+                        long betweenDay = cn.hutool.core.date.DateUtil.betweenDay(each.getDepartureTime(), each.getArrivalTime(), /*false 参数表示不包含当天*/false);
                         result.setDaysArrived((int) betweenDay);
                         result.setSaleStatus(new Date().after(trainDO.getSaleTime()) ? 0 : 1);
                         result.setSaleTime(convertDateToLocalTime(trainDO.getSaleTime(), "MM-dd HH:mm"));
@@ -236,6 +237,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                 lock.unlock();
             }
         }
+        //查询出来列车基本信息后，开始对列车按照出发时间进行排序。
         seatResults = CollUtil.isEmpty(seatResults)
                 ? regionTrainStationAllMap.values().stream().map(each -> JSON.parseObject(each.toString(), TicketListDTO.class)).toList()
                 : seatResults;
@@ -299,6 +301,8 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
         List<String> trainStationPriceKeys = seatResults.stream()
                 .map(each -> String.format(cacheRedisPrefix + TRAIN_STATION_PRICE, each.getTrainId(), each.getDeparture(), each.getArrival()))
                 .toList();
+        //执行 Redis 的 管道（pipeline）操作，批量查询 trainStationPriceKeys 中的所有键。
+        //connection.stringCommands().get(each.getBytes()) 将每个键转换为字节并查询其对应的值。
         List<Object> trainStationPriceObjs = stringRedisTemplate.executePipelined((RedisCallback<String>) connection -> {
             trainStationPriceKeys.forEach(each -> connection.stringCommands().get(each.getBytes()));
             return null;
@@ -587,6 +591,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
             Integer partialRefundAmount = passengerDetails.stream()
                     .mapToInt(TicketOrderPassengerDetailRespDTO::getAmount)
                     .sum();
+            //TODO 全部退款?
             refundReqDTO.setRefundAmount(partialRefundAmount);
         }
         refundReqDTO.setOrderSn(requestParam.getOrderSn());

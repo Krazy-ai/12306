@@ -41,8 +41,11 @@ public final class IdempotentAspect {
         IdempotentExecuteHandler instance = IdempotentExecuteHandlerFactory.getInstance(idempotent.scene(), idempotent.type());
         Object resultObj;
         try {
+            // 执行幂等性检查
             instance.execute(joinPoint, idempotent);
+            // 执行目标方法
             resultObj = joinPoint.proceed();
+            // 后处理
             instance.postProcessing();
         } catch (RepeatConsumptionException ex) {
             /**
