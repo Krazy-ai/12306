@@ -27,7 +27,8 @@ rules:
             shardingColumn: username
             shardingAlgorithmName: user_table_hash_mod
       t_passenger:
-        actualDataNodes: ds_${0..1}.t_passenger_${0..31}
+        actualDataNodes: ds_0.t_passenger_${0..15},ds_1.t_passenger_${16..31}
+        #ds_${0..1}.t_passenger_${0..31}
         databaseStrategy:
           standard:
             shardingColumn: username

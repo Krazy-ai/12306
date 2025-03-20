@@ -50,6 +50,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static org.opengoofy.index12306.biz.userservice.common.constant.RedisKeyConstant.USER_PASSENGERID_CARDID;
 import static org.opengoofy.index12306.biz.userservice.common.constant.RedisKeyConstant.USER_PASSENGER_LIST;
 
 /**
@@ -85,6 +86,21 @@ public class PassengerServiceImpl implements PassengerService {
                 },
                 1,
                 TimeUnit.DAYS
+        );
+    }
+
+    public String getCardIdById(String id) {
+        return distributedCache.safeGet(
+                USER_PASSENGERID_CARDID + id,
+                String.class,
+                () -> {
+                    LambdaQueryWrapper<PassengerDO> queryWrapper = Wrappers.lambdaQuery(PassengerDO.class)
+                            .eq(PassengerDO::getId, id);
+                    PassengerDO passenger = passengerMapper.selectOne(queryWrapper);
+                    return passenger.getIdCard();
+                },
+                1,
+                TimeUnit.HOURS
         );
     }
 

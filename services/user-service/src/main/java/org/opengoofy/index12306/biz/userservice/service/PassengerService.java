@@ -48,6 +48,14 @@ public interface PassengerService {
     List<PassengerActualRespDTO> listPassengerQueryByIds(String username, List<Long> ids);
 
     /**
+     * 根据乘车人 ID 查询乘车人身份证号
+     *
+     * @param id      乘车人ID
+     * @return 身份证号
+     */
+    String getCardIdById(String id);
+
+    /**
      * 新增乘车人
      *
      * @param requestParam 乘车人信息

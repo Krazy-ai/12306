@@ -142,4 +142,9 @@ public final class RedisKeyConstant {
      * 令牌获取失败分布式锁 Key
      */
     public static final String LOCK_TOKEN_BUCKET_ISNULL = "index12306-ticket-service:lock:token-bucket-isnull:%s";
+
+    /**
+     * 车票时间冲突判断 Key Prefix + 用户ID_日期
+     */
+    public static final String TICKET_TIME_CONFLICT = "index12306-ticket-service:train_time:";
 }

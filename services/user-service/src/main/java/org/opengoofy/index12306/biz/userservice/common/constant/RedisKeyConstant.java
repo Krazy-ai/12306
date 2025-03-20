@@ -42,4 +42,9 @@ public final class RedisKeyConstant {
      * 用户乘车人列表，Key Prefix + 用户名
      */
     public static final String USER_PASSENGER_LIST = "index12306-user-service:user-passenger-list:";
+
+    /**
+     * 乘车人id与身份证号映射，Key Prefix + 乘车人id
+     */
+    public static final String USER_PASSENGERID_CARDID = "index12306-user-service:passengerid-cardid:";
 }

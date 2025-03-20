@@ -146,6 +146,12 @@
             <artifactId>activation</artifactId>
             <version>1.1.1</version>
         </dependency>
+        <dependency>
+            <groupId>org.opengoofy.index12306</groupId>
+            <artifactId>index12306-user-service</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <scope>compile</scope>
+        </dependency>
         <!-- NoClassDefFoundError: javax/xml/bind/JAXBException end -->
     </dependencies>
 </project>

@@ -19,6 +19,7 @@ package org.opengoofy.index12306.biz.ticketservice.remote;
 
 import org.opengoofy.index12306.biz.ticketservice.remote.dto.PassengerRespDTO;
 import org.opengoofy.index12306.framework.starter.convention.result.Result;
+import org.opengoofy.index12306.framework.starter.web.Results;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,4 +38,7 @@ public interface UserRemoteService {
      */
     @GetMapping("/api/user-service/inner/passenger/actual/query/ids")
     Result<List<PassengerRespDTO>> listPassengerQueryByIds(@RequestParam("username") String username, @RequestParam("ids") List<String> ids);
+
+    @GetMapping("/api/user-service/passenger/query/cardId/id")
+    Result<String> getCardIdById(@RequestParam("id") String id);
 }

@@ -36,6 +36,6 @@ public class TrainPurchaseTicketRepeatChainHandler implements TrainPurchaseTicke
 
     @Override
     public int getOrder() {
-        return 30;
+        return 40;
     }
 }

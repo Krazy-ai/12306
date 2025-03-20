@@ -81,6 +81,7 @@ import org.opengoofy.index12306.framework.starter.bases.ApplicationContextHolder
 import org.opengoofy.index12306.framework.starter.cache.DistributedCache;
 import org.opengoofy.index12306.framework.starter.cache.toolkit.CacheUtil;
 import org.opengoofy.index12306.framework.starter.common.toolkit.BeanUtil;
+import org.opengoofy.index12306.framework.starter.common.toolkit.BitmapUtil;
 import org.opengoofy.index12306.framework.starter.convention.exception.ServiceException;
 import org.opengoofy.index12306.framework.starter.convention.result.Result;
 import org.opengoofy.index12306.framework.starter.designpattern.chain.AbstractChainContext;
@@ -97,15 +98,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -113,16 +106,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import static org.opengoofy.index12306.biz.ticketservice.common.constant.Index12306Constant.ADVANCE_TICKET_DAY;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.LOCK_PURCHASE_TICKETS;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.LOCK_PURCHASE_TICKETS_V2;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.LOCK_REGION_TRAIN_STATION;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.LOCK_REGION_TRAIN_STATION_MAPPING;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.LOCK_TOKEN_BUCKET_ISNULL;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.REGION_TRAIN_STATION;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.REGION_TRAIN_STATION_MAPPING;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.TRAIN_INFO;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.TRAIN_STATION_PRICE;
-import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.TRAIN_STATION_REMAINING_TICKET;
+import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKeyConstant.*;
 import static org.opengoofy.index12306.biz.ticketservice.toolkit.DateUtil.convertDateToLocalTime;
 
 /**
@@ -400,6 +384,8 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
         List<RLock> distributedLockList = new ArrayList<>();
         Map<Integer, List<PurchaseTicketPassengerDetailDTO>> seatTypeMap = requestParam.getPassengers().stream()
                 .collect(Collectors.groupingBy(PurchaseTicketPassengerDetailDTO::getSeatType));
+        //座位类型加锁
+        //TODO 分站点加锁->间隙锁
         seatTypeMap.forEach((searType, count) -> {
             String lockKey = environment.resolvePlaceholders(String.format(LOCK_PURCHASE_TICKETS_V2, requestParam.getTrainId(), searType));
             ReentrantLock localLock = localLockMap.getIfPresent(lockKey);
@@ -511,6 +497,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                 log.error("订单服务调用失败，返回结果：{}", ticketOrderResult.getMessage());
                 throw new ServiceException("订单服务调用失败");
             }
+
         } catch (Throwable ex) {
             log.error("远程调用订单服务创建错误，请求参数：{}", JSON.toJSONString(requestParam), ex);
             throw ex;
@@ -552,6 +539,17 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                                 .increment(TRAIN_STATION_REMAINING_TICKET + keySuffix, String.valueOf(seatType), ticketOrderPassengerDetailRespDTOList.size());
                     });
                 });
+                //TODO 订单时间移除bitmap
+                int startIndex = BitmapUtil.getTenMinuteIndex(ticketOrderDetail.getDepartureTime());
+                int endIndex = BitmapUtil.getTenMinuteIndex(ticketOrderDetail.getArrivalTime());
+                List<TicketOrderPassengerDetailRespDTO> ticketOrderPassengerDetailRespDTOList = ticketOrderDetail.getPassengerDetails();
+                for(TicketOrderPassengerDetailRespDTO each : ticketOrderPassengerDetailRespDTOList){
+                    String keySuffix = BitmapUtil.buildRedisKey(each.getIdCard(), ticketOrderDetail.getDepartureTime());
+                    for (int i = startIndex; i < endIndex; i++) {
+                        stringRedisTemplate.opsForValue().setBit(TICKET_TIME_CONFLICT + keySuffix, i, false);
+                    }
+                }
+
             } catch (Throwable ex) {
                 log.error("[取消关闭订单] 订单号：{} 回滚列车Cache余票失败", requestParam.getOrderSn(), ex);
                 throw ex;

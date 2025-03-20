@@ -63,6 +63,11 @@ public class PassengerController {
         return Results.success(passengerService.listPassengerQueryByIds(username, ids));
     }
 
+    @GetMapping("/api/user-service/passenger/query/cardId/id")
+    public Result<String> getCardIdById(@RequestParam("id") String id) {
+        return Results.success(passengerService.getCardIdById(id));
+    }
+
     /**
      * 新增乘车人
      */

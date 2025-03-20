@@ -19,6 +19,7 @@ package org.opengoofy.index12306.biz.orderservice.service.impl;
 
 import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.text.StrBuilder;
+import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -54,7 +55,9 @@ import org.opengoofy.index12306.biz.orderservice.service.OrderItemService;
 import org.opengoofy.index12306.biz.orderservice.service.OrderPassengerRelationService;
 import org.opengoofy.index12306.biz.orderservice.service.OrderService;
 import org.opengoofy.index12306.biz.orderservice.service.orderid.OrderIdGeneratorManager;
+import org.opengoofy.index12306.framework.starter.cache.DistributedCache;
 import org.opengoofy.index12306.framework.starter.common.toolkit.BeanUtil;
+import org.opengoofy.index12306.framework.starter.common.toolkit.BitmapUtil;
 import org.opengoofy.index12306.framework.starter.convention.exception.ClientException;
 import org.opengoofy.index12306.framework.starter.convention.exception.ServiceException;
 import org.opengoofy.index12306.framework.starter.convention.page.PageResponse;
@@ -63,12 +66,14 @@ import org.opengoofy.index12306.framework.starter.database.toolkit.PageUtil;
 import org.opengoofy.index12306.frameworks.starter.user.core.UserContext;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+
 
 /**
  * 订单服务接口层实现
@@ -79,6 +84,7 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
+    public static final String TICKET_TIME_CONFLICT = "index12306-ticket-service:train_time:";
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
     private final OrderItemService orderItemService;
@@ -86,6 +92,7 @@ public class OrderServiceImpl implements OrderService {
     private final RedissonClient redissonClient;
     private final DelayCloseOrderSendProduce delayCloseOrderSendProduce;
     private final UserRemoteService userRemoteService;
+    private final DistributedCache distributedCache;
 
     @Override
     public TicketOrderDetailRespDTO queryTicketOrderByOrderSn(String orderSn) {
@@ -163,6 +170,15 @@ public class OrderServiceImpl implements OrderService {
                     .orderSn(orderSn)
                     .build();
             orderPassengerRelationDOList.add(orderPassengerRelationDO);
+            // 订单时间存入bitmap    TODO 跨自然日的处理
+            StringRedisTemplate stringRedisTemplate = (StringRedisTemplate) distributedCache.getInstance();
+            String keySuffix = BitmapUtil.buildRedisKey(each.getIdCard(), requestParam.getDepartureTime());
+            int startIndex = BitmapUtil.getTenMinuteIndex(requestParam.getDepartureTime());
+            int endIndex = BitmapUtil.getTenMinuteIndex(requestParam.getArrivalTime());
+            for (int i = startIndex; i < endIndex; i++) {
+                stringRedisTemplate.opsForValue().setBit(TICKET_TIME_CONFLICT + keySuffix, i, true);
+            }
+            stringRedisTemplate.expire(TICKET_TIME_CONFLICT + keySuffix, 15, TimeUnit.DAYS);
         });
         orderItemService.saveBatch(orderItemDOList);
         orderPassengerRelationService.saveBatch(orderPassengerRelationDOList);
@@ -328,4 +344,6 @@ public class OrderServiceImpl implements OrderService {
         }
         return result;
     }
+
+
 }
