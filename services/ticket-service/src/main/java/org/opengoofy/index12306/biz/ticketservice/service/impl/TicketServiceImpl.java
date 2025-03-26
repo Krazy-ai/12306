@@ -30,21 +30,15 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.collect.Lists;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.rocketmq.client.producer.SendStatus;
 import org.opengoofy.index12306.biz.ticketservice.common.enums.RefundTypeEnum;
 import org.opengoofy.index12306.biz.ticketservice.common.enums.SourceEnum;
 import org.opengoofy.index12306.biz.ticketservice.common.enums.TicketChainMarkEnum;
 import org.opengoofy.index12306.biz.ticketservice.common.enums.TicketStatusEnum;
 import org.opengoofy.index12306.biz.ticketservice.common.enums.VehicleTypeEnum;
-import org.opengoofy.index12306.biz.ticketservice.dao.entity.StationDO;
-import org.opengoofy.index12306.biz.ticketservice.dao.entity.TicketDO;
-import org.opengoofy.index12306.biz.ticketservice.dao.entity.TrainDO;
-import org.opengoofy.index12306.biz.ticketservice.dao.entity.TrainStationPriceDO;
-import org.opengoofy.index12306.biz.ticketservice.dao.entity.TrainStationRelationDO;
-import org.opengoofy.index12306.biz.ticketservice.dao.mapper.StationMapper;
-import org.opengoofy.index12306.biz.ticketservice.dao.mapper.TicketMapper;
-import org.opengoofy.index12306.biz.ticketservice.dao.mapper.TrainMapper;
-import org.opengoofy.index12306.biz.ticketservice.dao.mapper.TrainStationPriceMapper;
-import org.opengoofy.index12306.biz.ticketservice.dao.mapper.TrainStationRelationMapper;
+import org.opengoofy.index12306.biz.ticketservice.dao.entity.*;
+import org.opengoofy.index12306.biz.ticketservice.dao.mapper.*;
 import org.opengoofy.index12306.biz.ticketservice.dto.domain.PurchaseTicketPassengerDetailDTO;
 import org.opengoofy.index12306.biz.ticketservice.dto.domain.RouteDTO;
 import org.opengoofy.index12306.biz.ticketservice.dto.domain.SeatClassDTO;
@@ -59,6 +53,8 @@ import org.opengoofy.index12306.biz.ticketservice.dto.resp.RefundTicketRespDTO;
 import org.opengoofy.index12306.biz.ticketservice.dto.resp.TicketOrderDetailRespDTO;
 import org.opengoofy.index12306.biz.ticketservice.dto.resp.TicketPageQueryRespDTO;
 import org.opengoofy.index12306.biz.ticketservice.dto.resp.TicketPurchaseRespDTO;
+import org.opengoofy.index12306.biz.ticketservice.mq.event.PurchaseTicketsEvent;
+import org.opengoofy.index12306.biz.ticketservice.mq.produce.PurchaseTicketsSendProduce;
 import org.opengoofy.index12306.biz.ticketservice.remote.PayRemoteService;
 import org.opengoofy.index12306.biz.ticketservice.remote.TicketOrderRemoteService;
 import org.opengoofy.index12306.biz.ticketservice.remote.dto.PayInfoRespDTO;
@@ -71,6 +67,7 @@ import org.opengoofy.index12306.biz.ticketservice.service.SeatService;
 import org.opengoofy.index12306.biz.ticketservice.service.TicketService;
 import org.opengoofy.index12306.biz.ticketservice.service.TrainStationService;
 import org.opengoofy.index12306.biz.ticketservice.service.cache.SeatMarginCacheLoader;
+import org.opengoofy.index12306.biz.ticketservice.service.handler.ticket.dto.OrderTrackingRespDTO;
 import org.opengoofy.index12306.biz.ticketservice.service.handler.ticket.dto.TokenResultDTO;
 import org.opengoofy.index12306.biz.ticketservice.service.handler.ticket.dto.TrainPurchaseTicketRespDTO;
 import org.opengoofy.index12306.biz.ticketservice.service.handler.ticket.select.TrainSeatTypeSelector;
@@ -85,6 +82,7 @@ import org.opengoofy.index12306.framework.starter.common.toolkit.BitmapUtil;
 import org.opengoofy.index12306.framework.starter.convention.exception.ServiceException;
 import org.opengoofy.index12306.framework.starter.convention.result.Result;
 import org.opengoofy.index12306.framework.starter.designpattern.chain.AbstractChainContext;
+import org.opengoofy.index12306.framework.starter.distributedid.toolkit.SnowflakeIdUtil;
 import org.opengoofy.index12306.frameworks.starter.user.core.UserContext;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -125,6 +123,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
     private final TicketOrderRemoteService ticketOrderRemoteService;
     private final PayRemoteService payRemoteService;
     private final StationMapper stationMapper;
+    private final OrderTrackingMapper orderTrackingMapper;
     private final SeatService seatService;
     private final TrainStationService trainStationService;
     private final TrainSeatTypeSelector trainSeatTypeSelector;
@@ -135,6 +134,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
     private final RedissonClient redissonClient;
     private final ConfigurableEnvironment environment;
     private final TicketAvailabilityTokenBucket ticketAvailabilityTokenBucket;
+    private final PurchaseTicketsSendProduce purchaseTicketsSendProduce;
     private TicketService ticketService;
 
     @Value("${ticket.availability.cache-update.type:}")
@@ -376,16 +376,20 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                     }
                 }
             }
+            //TODO 既然数据库余票够，完全可以让这个请求成功去扣减数据库，然后加载新的令牌余量，现在这种设计感觉让请求不公平了
             throw new ServiceException("列车站点已无余票");
         }
         // v1 版本购票存在 4 个较为严重的问题，v2 版本相比较 v1 版本更具有业务特点以及性能，整体提升较大
-        // 写了详细的 v2 版本购票升级指南，详情查看：https://nageoffer.com/12306/question
+
         List<ReentrantLock> localLockList = new ArrayList<>();
         List<RLock> distributedLockList = new ArrayList<>();
         Map<Integer, List<PurchaseTicketPassengerDetailDTO>> seatTypeMap = requestParam.getPassengers().stream()
                 .collect(Collectors.groupingBy(PurchaseTicketPassengerDetailDTO::getSeatType));
         //座位类型加锁
-        //TODO 分站点加锁->间隙锁
+        //TODO 车次加锁-> 站点间隙锁
+        // 获取需要判断扣减的站点
+        List<RouteDTO> takeoutRouteDTOList = trainStationService
+                .listTakeoutTrainStationRoute(requestParam.getTrainId(), requestParam.getDeparture(), requestParam.getArrival());
         seatTypeMap.forEach((searType, count) -> {
             String lockKey = environment.resolvePlaceholders(String.format(LOCK_PURCHASE_TICKETS_V2, requestParam.getTrainId(), searType));
             ReentrantLock localLock = localLockMap.getIfPresent(lockKey);
@@ -419,6 +423,49 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
                 }
             });
         }
+    }
+
+    @Override
+    public String purchaseTicketsV3(PurchaseTicketReqDTO requestParam) {
+        // 责任链模式，验证 1：参数必填 2：参数正确性 3：乘客是否已买当前车次等...
+        purchaseTicketAbstractChainContext.handler(TicketChainMarkEnum.TRAIN_PURCHASE_TICKET_FILTER.name(), requestParam);
+        // 为什么需要令牌限流？余票缓存限流不可以么？详情查看：https://nageoffer.com/12306/question
+        TokenResultDTO tokenResult = ticketAvailabilityTokenBucket.takeTokenFromBucket(requestParam);
+        if (tokenResult.getTokenIsNull()) {
+            Object ifPresentObj = tokenTicketsRefreshMap.getIfPresent(requestParam.getTrainId());
+            if (ifPresentObj == null) {
+                synchronized (TicketService.class) {
+                    if (tokenTicketsRefreshMap.getIfPresent(requestParam.getTrainId()) == null) {
+                        ifPresentObj = new Object();
+                        tokenTicketsRefreshMap.put(requestParam.getTrainId(), ifPresentObj);
+                        tokenIsNullRefreshToken(requestParam, tokenResult);
+                    }
+                }
+            }
+            throw new ServiceException("列车站点已无余票");
+        }
+        // 通过消息队列方式异步完成下单接口吞吐量提升，通过业务模式规避复杂度
+        PurchaseTicketsEvent purchaseTicketsEvent = PurchaseTicketsEvent.builder()
+                .orderTrackingId(SnowflakeIdUtil.nextIdStr())
+                .originalRequestParam(requestParam)
+                .userInfo(UserContext.getUser())
+                .build();
+        SendResult sendResult = purchaseTicketsSendProduce.sendMessage(purchaseTicketsEvent);
+        if (!Objects.equals(sendResult.getSendStatus(), SendStatus.SEND_OK)) {
+            throw new ServiceException("发送用户异步购票消息失败");
+        }
+        // 返回全局唯一标识，当做用户购票异步返回和订单之间的关联关系
+        return purchaseTicketsEvent.getOrderTrackingId();
+    }
+
+    @Override
+    public OrderTrackingRespDTO purchaseTicketsV3Query(String orderTrackingId) {
+        LambdaQueryWrapper<OrderTrackingDO> queryWrapper = Wrappers.lambdaQuery(OrderTrackingDO.class)
+                .eq(OrderTrackingDO::getId, orderTrackingId)
+                // 添加 username 字段，以防止非登录用户访问其他用户的数据，避免数据横向越权
+                .eq(OrderTrackingDO::getUsername, UserContext.getUsername());
+        OrderTrackingDO orderTrackingDO = orderTrackingMapper.selectOne(queryWrapper);
+        return BeanUtil.convert(orderTrackingDO, OrderTrackingRespDTO.class);
     }
 
     @Override

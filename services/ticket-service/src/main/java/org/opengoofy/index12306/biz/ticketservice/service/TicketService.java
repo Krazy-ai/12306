@@ -27,6 +27,7 @@ import org.opengoofy.index12306.biz.ticketservice.dto.resp.RefundTicketRespDTO;
 import org.opengoofy.index12306.biz.ticketservice.dto.resp.TicketPageQueryRespDTO;
 import org.opengoofy.index12306.biz.ticketservice.dto.resp.TicketPurchaseRespDTO;
 import org.opengoofy.index12306.biz.ticketservice.remote.dto.PayInfoRespDTO;
+import org.opengoofy.index12306.biz.ticketservice.service.handler.ticket.dto.OrderTrackingRespDTO;
 import org.springframework.web.bind.annotation.RequestBody;
 
 /**
@@ -66,6 +67,16 @@ public interface TicketService extends IService<TicketDO> {
      * @return 订单号
      */
     TicketPurchaseRespDTO purchaseTicketsV2(@RequestBody PurchaseTicketReqDTO requestParam);
+
+    /**
+     * 购买车票V3处理热点车次版本
+     *
+     * @param requestParam 车票购买请求参数
+     * @return 订单号
+     */
+    String purchaseTicketsV3(@RequestBody PurchaseTicketReqDTO requestParam);
+
+    OrderTrackingRespDTO purchaseTicketsV3Query(String orderTrackingId);
 
     /**
      * 执行购买车票

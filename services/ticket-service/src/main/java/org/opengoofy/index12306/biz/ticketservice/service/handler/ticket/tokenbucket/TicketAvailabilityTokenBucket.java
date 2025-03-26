@@ -62,7 +62,6 @@ import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKe
 
 /**
  * 列车车票余量令牌桶，应对海量并发场景下满足并行、限流以及防超卖等场景
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
  */
 @Slf4j
 @Component
@@ -93,6 +92,7 @@ public final class TicketAvailabilityTokenBucket {
                 () -> trainMapper.selectById(requestParam.getTrainId()),
                 ADVANCE_TICKET_DAY,
                 TimeUnit.DAYS);
+        // 获取列车经停站之间的数据集合，因为一旦失效要读取整个列车的令牌并重新赋值
         List<RouteDTO> routeDTOList = trainStationService
                 .listTrainStationRoute(requestParam.getTrainId(), trainDO.getStartStation(), trainDO.getEndStation());
         StringRedisTemplate stringRedisTemplate = (StringRedisTemplate) distributedCache.getInstance();
@@ -112,7 +112,9 @@ public final class TicketAvailabilityTokenBucket {
                     for (RouteDTO each : routeDTOList) {
                         List<SeatTypeCountDTO> seatTypeCountDTOList = seatService.listSeatTypeCount(Long.parseLong(requestParam.getTrainId()), each.getStartStation(), each.getEndStation(), seatTypes);
                         for (SeatTypeCountDTO eachSeatTypeCountDTO : seatTypeCountDTOList) {
+                            // 组装 Hash 数据结构内部的 Key
                             String buildCacheKey = StrUtil.join("_", each.getStartStation(), each.getEndStation(), eachSeatTypeCountDTO.getSeatType());
+                            // 一个 Hash 结构下有很多 Key，为了避免多次网络 IO，这里组装成一个本地 Map，通过 putAll 方法请求一次 Redis
                             ticketAvailabilityTokenMap.put(buildCacheKey, String.valueOf(eachSeatTypeCountDTO.getSeatCount()));
                         }
                     }
@@ -129,6 +131,7 @@ public final class TicketAvailabilityTokenBucket {
             return redisScript;
         });
         Assert.notNull(actual);
+        // 因为购票时，一个用户可以为多个乘车人买票，而多个乘车人又能购买不同的票，所以这里需要根据座位类型进行分组
         Map<Integer, Long> seatTypeCountMap = requestParam.getPassengers().stream()
                 .collect(Collectors.groupingBy(PurchaseTicketPassengerDetailDTO::getSeatType, Collectors.counting()));
         JSONArray seatTypeCountArray = seatTypeCountMap.entrySet().stream()
@@ -139,6 +142,7 @@ public final class TicketAvailabilityTokenBucket {
                     return jsonObject;
                 })
                 .collect(Collectors.toCollection(JSONArray::new));
+        // 获取需要判断扣减的站点
         List<RouteDTO> takeoutRouteDTOList = trainStationService
                 .listTakeoutTrainStationRoute(requestParam.getTrainId(), requestParam.getDeparture(), requestParam.getArrival());
         String luaScriptKey = StrUtil.join("_", requestParam.getDeparture(), requestParam.getArrival());

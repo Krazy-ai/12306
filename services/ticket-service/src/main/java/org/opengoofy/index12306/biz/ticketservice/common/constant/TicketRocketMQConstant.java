@@ -62,4 +62,10 @@ public final class TicketRocketMQConstant {
      * 支付结果回调购票消费者组 Key
      */
     public static final String PAY_RESULT_CALLBACK_TICKET_CG_KEY = "index12306_pay-service_pay-result-callback-ticket_cg${unique-name:}";
+
+    public static final String PURCHASE_TICKET_ASYNC_TOPIC_KEY = "index12306_ticket-service_purchase_ticket_async_topic${unique-name:}";
+
+    public static final String PURCHASE_TICKET_ASYNC_TAG_KEY = "index12306_ticket-service_purchase_ticket_async_tag${unique-name:}";
+
+    public static final String PURCHASE_TICKET_ASYNC_CG_KEY = "index12306_ticket-service_purchase_ticket_async_cg${unique-name:}";
 }
