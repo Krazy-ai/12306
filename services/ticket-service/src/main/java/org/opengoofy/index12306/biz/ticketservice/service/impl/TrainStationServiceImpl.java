@@ -57,7 +57,7 @@ public class TrainStationServiceImpl implements TrainStationService {
                 .select(TrainStationDO::getDeparture);
         List<TrainStationDO> trainStationDOList = trainStationMapper.selectList(queryWrapper);
         List<String> trainStationAllList = trainStationDOList.stream().map(TrainStationDO::getDeparture).collect(Collectors.toList());
-        return StationCalculateUtil.throughStation(trainStationAllList, departure, arrival);
+        return StationCalculateUtil.throughRoute(trainStationAllList, departure, arrival);
     }
 
     @Override
@@ -67,6 +67,16 @@ public class TrainStationServiceImpl implements TrainStationService {
                 .select(TrainStationDO::getDeparture);
         List<TrainStationDO> trainStationDOList = trainStationMapper.selectList(queryWrapper);
         List<String> trainStationAllList = trainStationDOList.stream().map(TrainStationDO::getDeparture).collect(Collectors.toList());
-        return StationCalculateUtil.takeoutStation(trainStationAllList, departure, arrival);
+        return StationCalculateUtil.takeoutRoute(trainStationAllList, departure, arrival);
+    }
+
+    @Override
+    public List<String> listPassThroughTrainStation(String trainId, String departure, String arrival) {
+        LambdaQueryWrapper<TrainStationDO> queryWrapper = Wrappers.lambdaQuery(TrainStationDO.class)
+                .eq(TrainStationDO::getTrainId, trainId)
+                .select(TrainStationDO::getDeparture);
+        List<TrainStationDO> trainStationDOList = trainStationMapper.selectList(queryWrapper);
+        List<String> trainStationAllList = trainStationDOList.stream().map(TrainStationDO::getDeparture).collect(Collectors.toList());
+        return StationCalculateUtil.throughStation(trainStationAllList, departure, arrival);
     }
 }

@@ -17,6 +17,7 @@
 
 package org.opengoofy.index12306.biz.ticketservice.service;
 
+import org.opengoofy.index12306.biz.ticketservice.dao.entity.TrainStationDO;
 import org.opengoofy.index12306.biz.ticketservice.dto.domain.RouteDTO;
 import org.opengoofy.index12306.biz.ticketservice.dto.resp.TrainStationQueryRespDTO;
 
@@ -48,7 +49,7 @@ public interface TrainStationService {
     List<RouteDTO> listTrainStationRoute(String trainId, String departure, String arrival);
 
     /**
-     * 获取需列车站点扣减路线关系
+     * 获取列车站点扣减路线关系
      * 获取开始站点和目的站点、中间站点以及关联站点信息
      *
      * @param trainId   列车 ID
@@ -57,4 +58,15 @@ public interface TrainStationService {
      * @return 需扣减列车站点路线关系信息
      */
     List<RouteDTO> listTakeoutTrainStationRoute(String trainId, String departure, String arrival);
+
+    /**
+     * 获取路程上的列车站点
+     * 获取开始站点和目的站点、中间站点以及关联站点信息
+     *
+     * @param trainId   列车 ID
+     * @param departure 出发站
+     * @param arrival   到达站
+     * @return 路程上的列车站点
+     */
+    List<String> listPassThroughTrainStation(String trainId, String departure, String arrival);
 }

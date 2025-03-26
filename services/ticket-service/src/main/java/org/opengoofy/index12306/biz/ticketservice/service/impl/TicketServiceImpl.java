@@ -351,6 +351,7 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
         }
     }
 
+    //避免重复创建相同的锁对象
     private final Cache<String, ReentrantLock> localLockMap = Caffeine.newBuilder()
             .expireAfterWrite(1, TimeUnit.DAYS)
             .build();
@@ -385,13 +386,10 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
         List<RLock> distributedLockList = new ArrayList<>();
         Map<Integer, List<PurchaseTicketPassengerDetailDTO>> seatTypeMap = requestParam.getPassengers().stream()
                 .collect(Collectors.groupingBy(PurchaseTicketPassengerDetailDTO::getSeatType));
+
         //座位类型加锁
-        //TODO 车次加锁-> 站点间隙锁
-        // 获取需要判断扣减的站点
-        List<RouteDTO> takeoutRouteDTOList = trainStationService
-                .listTakeoutTrainStationRoute(requestParam.getTrainId(), requestParam.getDeparture(), requestParam.getArrival());
-        seatTypeMap.forEach((searType, count) -> {
-            String lockKey = environment.resolvePlaceholders(String.format(LOCK_PURCHASE_TICKETS_V2, requestParam.getTrainId(), searType));
+        /*seatTypeMap.forEach((seatType, count) -> {
+            String lockKey = environment.resolvePlaceholders(String.format(LOCK_PURCHASE_TICKETS_V2, requestParam.getTrainId(), seatType));
             ReentrantLock localLock = localLockMap.getIfPresent(lockKey);
             if (localLock == null) {
                 synchronized (TicketService.class) {
@@ -404,21 +402,67 @@ public class TicketServiceImpl extends ServiceImpl<TicketMapper, TicketDO> imple
             localLockList.add(localLock);
             RLock distributedLock = redissonClient.getFairLock(lockKey);
             distributedLockList.add(distributedLock);
+        });*/
+
+        //TODO 锁会不会太多了--压测
+        List<String> stations = trainStationService
+                .listPassThroughTrainStation(requestParam.getTrainId(), requestParam.getDeparture(), requestParam.getArrival());
+        //车次加锁-> 站点间隙锁
+        List<String> segments = new ArrayList<>();
+        for (int i = 0; i < stations.size() - 1; i++) {
+            String start = stations.get(i);
+            String end = stations.get(i + 1);
+            segments.add(start + "_" + end);
+        }
+        seatTypeMap.forEach((seatType, count) -> {
+            segments.forEach(segment -> {
+                String lockKey = environment.resolvePlaceholders(String.format(LOCK_PURCHASE_TICKETS_V2_SEGMENT, requestParam.getTrainId(), segment, seatType));
+                ReentrantLock localLock = localLockMap.getIfPresent(lockKey);
+                if (localLock == null) {
+                    // Caffeine 不像 ConcurrentHashMap 做了并发读写安全控制，这里需要自己控制
+                    synchronized (TicketService.class) {
+                        if ((localLock = localLockMap.getIfPresent(lockKey)) == null) {
+                            // 创建本地公平锁并放入本地公平锁容器中
+                            localLock = new ReentrantLock(true);
+                            localLockMap.put(lockKey, localLock);
+                        }
+                    }
+                }
+                localLockList.add(localLock);
+                RLock distributedLock = redissonClient.getFairLock(lockKey);
+                distributedLockList.add(distributedLock);
+            });
         });
         try {
-            localLockList.forEach(ReentrantLock::lock);
-            distributedLockList.forEach(RLock::lock);
+            for (ReentrantLock localLock : localLockList) {
+                if (!localLock.tryLock(10, TimeUnit.SECONDS)) {
+                    // 处理获取锁失败的情况
+                    throw new ServiceException("系统繁忙，请稍后重试");
+                }
+            }
+            for (RLock distributedLock : distributedLockList) {
+                if (!distributedLock.tryLock(10, TimeUnit.SECONDS)) {
+                    // 处理获取锁失败的情况
+                    throw new ServiceException("系统繁忙，请稍后重试");
+                }
+            }
             return ticketService.executePurchaseTickets(requestParam);
+        } catch (InterruptedException e) {
+            throw new ServiceException("系统繁忙，请稍后重试");
         } finally {
             localLockList.forEach(localLock -> {
                 try {
-                    localLock.unlock();
+                    if (localLock.isHeldByCurrentThread()) {
+                        localLock.unlock();
+                    }
                 } catch (Throwable ignored) {
                 }
             });
             distributedLockList.forEach(distributedLock -> {
                 try {
-                    distributedLock.unlock();
+                    if (distributedLock.isHeldByCurrentThread()) {
+                        distributedLock.unlock();
+                    }
                 } catch (Throwable ignored) {
                 }
             });
