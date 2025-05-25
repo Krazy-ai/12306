@@ -27,7 +27,6 @@ import java.lang.reflect.Method;
 
 /**
  * 幂等注解 AOP 拦截器
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
  */
 @Aspect
 public final class IdempotentAspect {
@@ -37,7 +36,9 @@ public final class IdempotentAspect {
      */
     @Around("@annotation(org.opengoofy.index12306.framework.starter.idempotent.annotation.Idempotent)")
     public Object idempotentHandler(ProceedingJoinPoint joinPoint) throws Throwable {
+        // 获取到方法上的幂等注解实际数据
         Idempotent idempotent = getIdempotent(joinPoint);
+        // 通过幂等场景以及幂等类型，获取幂等执行处理器
         IdempotentExecuteHandler instance = IdempotentExecuteHandlerFactory.getInstance(idempotent.scene(), idempotent.type());
         Object resultObj;
         try {
@@ -49,7 +50,7 @@ public final class IdempotentAspect {
             instance.postProcessing();
         } catch (RepeatConsumptionException ex) {
             /**
-             * 触发幂等逻辑时可能有两种情况：
+             * 该异常为消息队列防重复提交独有，触发幂等逻辑时可能有两种情况：
              *    * 1. 消息还在处理，但是不确定是否执行成功，那么需要返回错误，方便 RocketMQ 再次通过重试队列投递
              *    * 2. 消息处理成功了，该消息直接返回成功即可
              */
@@ -60,6 +61,7 @@ public final class IdempotentAspect {
         } catch (Throwable ex) {
             // 客户端消费存在异常，需要删除幂等标识方便下次 RocketMQ 再次通过重试队列投递
             instance.exceptionProcessing();
+            //抛出异常，RocketMQ 客户端检测到消费失败,触发重试
             throw ex;
         } finally {
             IdempotentContext.clean();

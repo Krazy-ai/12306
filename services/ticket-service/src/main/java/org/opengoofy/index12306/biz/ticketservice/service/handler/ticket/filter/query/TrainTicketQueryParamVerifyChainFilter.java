@@ -44,7 +44,7 @@ import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKe
 
 /**
  * 查询列车车票流程过滤器之验证数据是否正确
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+
  */
 @Component
 @RequiredArgsConstructor
@@ -71,6 +71,7 @@ public class TrainTicketQueryParamVerifyChainFilter implements TrainTicketQueryC
         );
         // 这里有个毕竟坑的地方，就算为空，也会返回数据，所以我们通过 filter 判断对象是否为空
         long emptyCount = actualExistList.stream().filter(Objects::isNull).count();
+        // 如果为空的记录是0的话，就证明出发站点和到达站点存在，正常返回即可
         if (emptyCount == 0L) {
             return;
         }

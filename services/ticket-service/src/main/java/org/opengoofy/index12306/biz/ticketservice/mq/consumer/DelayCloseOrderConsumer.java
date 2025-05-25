@@ -53,7 +53,7 @@ import static org.opengoofy.index12306.biz.ticketservice.common.constant.RedisKe
 
 /**
  * 延迟关闭订单消费者
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+
  */
 @Slf4j
 @Component
@@ -88,7 +88,6 @@ public class DelayCloseOrderConsumer implements RocketMQListener<MessageWrapper<
         String orderSn = delayCloseOrderEvent.getOrderSn();
         Result<Boolean> closedTickOrder;
         try {
-            //TODO 这里要远程调用吗？
             closedTickOrder = ticketOrderRemoteService.closeTickOrder(new CancelTicketOrderReqDTO(orderSn));
         } catch (Throwable ex) {
             log.error("[延迟关闭订单] 订单号：{} 远程调用订单服务失败", orderSn, ex);
@@ -96,6 +95,7 @@ public class DelayCloseOrderConsumer implements RocketMQListener<MessageWrapper<
         }
         if (closedTickOrder.isSuccess() && !StrUtil.equals(ticketAvailabilityCacheUpdateType, "binlog")) {
             if (!closedTickOrder.getData()) {
+                //closedTickOrder.getData()为false，即不是未支付状态
                 log.info("[延迟关闭订单] 订单号：{} 用户已支付订单", orderSn);
                 return;
             }
@@ -109,7 +109,6 @@ public class DelayCloseOrderConsumer implements RocketMQListener<MessageWrapper<
                 log.error("[延迟关闭订单] 订单号：{} 回滚列车DB座位状态失败", orderSn, ex);
                 throw ex;
             }
-            //TODO 没保证数据一致性，why
             try {
                 StringRedisTemplate stringRedisTemplate = (StringRedisTemplate) distributedCache.getInstance();
                 Map<Integer, List<TrainPurchaseTicketRespDTO>> seatTypeMap = trainPurchaseTicketResults.stream()

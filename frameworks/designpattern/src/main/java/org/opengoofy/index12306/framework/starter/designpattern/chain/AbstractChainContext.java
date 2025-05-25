@@ -31,7 +31,6 @@ import java.util.stream.Collectors;
 
 /**
  * 抽象责任链上下文
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
  */
 public final class AbstractChainContext<T> implements CommandLineRunner {
 
@@ -53,8 +52,7 @@ public final class AbstractChainContext<T> implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        Map<String, AbstractChainHandler> chainFilterMap = ApplicationContextHolder
-                .getBeansOfType(AbstractChainHandler.class);
+        Map<String, AbstractChainHandler> chainFilterMap = ApplicationContextHolder.getBeansOfType(AbstractChainHandler.class);
         chainFilterMap.forEach((beanName, bean) -> {
             List<AbstractChainHandler> abstractChainHandlers = abstractChainHandlerContainer.get(bean.mark());
             if (CollectionUtils.isEmpty(abstractChainHandlers)) {

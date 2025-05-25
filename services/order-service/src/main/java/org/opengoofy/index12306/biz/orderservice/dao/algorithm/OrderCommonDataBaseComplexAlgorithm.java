@@ -31,13 +31,13 @@ import java.util.Properties;
 
 /**
  * 订单数据库复合分片算法配置
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
  */
 public class OrderCommonDataBaseComplexAlgorithm implements ComplexKeysShardingAlgorithm {
 
     @Getter
     private Properties props;
 
+    // 分库数量，读取的配置中定义的分库数量
     private int shardingCount;
     private int tableShardingCount;
 
@@ -50,10 +50,14 @@ public class OrderCommonDataBaseComplexAlgorithm implements ComplexKeysShardingA
         Collection<String> result = new LinkedHashSet<>(availableTargetNames.size());
         if (CollUtil.isNotEmpty(columnNameAndShardingValuesMap)) {
             String userId = "user_id";
+            // 首先判断 SQL 是否包含用户 ID，如果包含直接取用户 ID 后六位
             Collection<Comparable<?>> customerUserIdCollection = columnNameAndShardingValuesMap.get(userId);
             if (CollUtil.isNotEmpty(customerUserIdCollection)) {
                 String dbSuffix;
                 Comparable<?> comparable = customerUserIdCollection.stream().findFirst().get();
+                // 如果使用 MybatisPlus 因为传入时没有强类型判断，所以有可能用户 ID 是字符串，也可能是 Long 等数值
+                // 比如传入的用户 ID 可能是 1683025552364568576 也可能是 '1683025552364568576'
+                // 根据不同的值类型，做出不同的获取后六位判断。字符串直接截取后六位，Long 类型直接通过 % 运算获取后六位
                 if (comparable instanceof String) {
                     String actualUserId = comparable.toString();
                     dbSuffix = String.valueOf(hashShardingValue(actualUserId.substring(Math.max(actualUserId.length() - 6, 0))) % shardingCount / tableShardingCount);
@@ -62,6 +66,7 @@ public class OrderCommonDataBaseComplexAlgorithm implements ComplexKeysShardingA
                 }
                 result.add("ds_" + dbSuffix);
             } else {
+                // 如果对订单中的 SQL 语句不包含用户 ID 那么就要从订单号中获取后六位，也就是用户 ID 后六位
                 String orderSn = "order_sn";
                 String dbSuffix;
                 Collection<Comparable<?>> orderSnCollection = columnNameAndShardingValuesMap.get(orderSn);

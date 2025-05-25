@@ -19,15 +19,14 @@ package org.opengoofy.index12306.biz.payservice.service.payid;
 
 /**
  * 全局唯一订单号生成器
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
  */
 public class DistributedIdGenerator {
 
     private static final long EPOCH = 1609459200000L;
-    private static final int NODE_BITS = 5;
-    private static final int SEQUENCE_BITS = 7;
+    private static final int NODE_BITS = 5;//节点 ID 所占的位数
+    private static final int SEQUENCE_BITS = 7;//序列号所占的位数
 
-    private final long nodeID;
+    private final long nodeID;//节点 ID，用于标识不同的节点。
     private long lastTimestamp = -1L;
     private long sequence = 0L;
 
@@ -41,8 +40,10 @@ public class DistributedIdGenerator {
             throw new RuntimeException("Clock moved backwards. Refusing to generate ID.");
         }
         if (timestamp == lastTimestamp) {
+            //将序列号加 1，(1 << SEQUENCE_BITS) - 1 会生成一个掩码，用于确保序列号不会超出 SEQUENCE_BITS 规定的范围。
             sequence = (sequence + 1) & ((1 << SEQUENCE_BITS) - 1);
             if (sequence == 0) {
+                //若序列号达到最大值后又变回 0，意味着当前时间戳内的序列号已用完，需调用 tilNextMillis 方法等待下一个时间戳。
                 timestamp = tilNextMillis(lastTimestamp);
             }
         } else {

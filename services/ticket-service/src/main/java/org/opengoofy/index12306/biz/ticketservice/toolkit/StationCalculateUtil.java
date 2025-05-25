@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 
 /**
  * 站点计算工具
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
  */
 public final class StationCalculateUtil {
 
@@ -111,7 +110,7 @@ public final class StationCalculateUtil {
     public static void main(String[] args) {
         List<String> stations = Arrays.asList("北京南", "济南西", "南京南", "杭州东", "宁波");
         String startStation = "北京南";
-        String endStation = "南京南";
-        StationCalculateUtil.takeoutRoute(stations, startStation, endStation).forEach(System.out::println);
+        String endStation = "杭州东";
+        StationCalculateUtil.throughRoute(stations, startStation, endStation).forEach(System.out::println);
     }
 }

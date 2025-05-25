@@ -28,7 +28,7 @@ import static org.opengoofy.index12306.framework.starter.web.config.WebAutoConfi
 
 /**
  * 通过 {@link InitializeDispatcherServletController} 初始化 {@link DispatcherServlet}
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+ * 在 Spring Boot 应用启动完成后，自动向应用自身发送一个初始化请求，预热 DispatcherServlet
  */
 @RequiredArgsConstructor
 public final class InitializeDispatcherServletHandler implements CommandLineRunner {

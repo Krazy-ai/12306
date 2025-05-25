@@ -19,7 +19,7 @@ package org.opengoofy.index12306.biz.ticketservice.common.constant;
 
 /**
  * Redis Key 定义常量类
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+
  */
 public final class RedisKeyConstant {
 
@@ -39,7 +39,7 @@ public final class RedisKeyConstant {
     public static final String LOCK_REGION_TRAIN_STATION_MAPPING = "index12306-ticket-service:lock:region_train_station_mapping";
 
     /**
-     * 站点查询，Key Prefix + 起始城市_终点城市_日期
+     * 站点查询，Key Prefix + 起始城市_终点城市
      */
     public static final String REGION_TRAIN_STATION = "index12306-ticket-service:region_train_station:%s_%s";
 
@@ -104,7 +104,7 @@ public final class RedisKeyConstant {
     public static final String LOCK_PURCHASE_TICKETS_V2 = "${unique-name:}index12306-ticket-service:lock:purchase_tickets_%s_%d";
 
     /**
-     * 用户购票分布式锁 Key v2
+     * 用户购票区间加锁分布式锁 Key v2
      */
     public static final String LOCK_PURCHASE_TICKETS_V2_SEGMENT = "${unique-name:}index12306-ticket-service:lock:purchase_tickets_%s_%s_%d";
 

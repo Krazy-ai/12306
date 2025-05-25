@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 基于 SpEL 方法验证请求幂等性，适用于 MQ 场景
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
  */
 @RequiredArgsConstructor
 public final class IdempotentSpELByMQExecuteHandler extends AbstractIdempotentExecuteHandler implements IdempotentSpELService {
@@ -55,12 +54,14 @@ public final class IdempotentSpELByMQExecuteHandler extends AbstractIdempotentEx
     @Override
     protected IdempotentParamWrapper buildWrapper(ProceedingJoinPoint joinPoint) {
         Idempotent idempotent = IdempotentAspect.getIdempotent(joinPoint);
+        // 通过执行 SpEL 表达式获取值
         String key = (String) SpELUtil.parseKey(idempotent.key(), ((MethodSignature) joinPoint.getSignature()).getMethod(), joinPoint.getArgs());
         return IdempotentParamWrapper.builder().lockKey(key).joinPoint(joinPoint).build();
     }
 
     @Override
     public void handler(IdempotentParamWrapper wrapper) {
+        // 拼接前缀和 SpEL 表达式对应的 Key 生成最终放到 Redis 中的唯一标识
         String uniqueKey = wrapper.getIdempotent().uniqueKeyPrefix() + wrapper.getLockKey();
         String absentAndGet = this.setIfAbsentAndGet(uniqueKey, IdempotentMQConsumeStatusEnum.CONSUMING.getCode(), TIMEOUT, TimeUnit.SECONDS);
         //若不为null,则返回值
@@ -95,6 +96,10 @@ public final class IdempotentSpELByMQExecuteHandler extends AbstractIdempotentEx
         if (wrapper != null) {
             Idempotent idempotent = wrapper.getIdempotent();
             String uniqueKey = idempotent.uniqueKeyPrefix() + wrapper.getLockKey();
+            String flag = distributedCache.get(uniqueKey, String.class);
+            if(flag.equals(IdempotentMQConsumeStatusEnum.CONSUMED.getCode())){
+                return;
+            }
             try {
                 distributedCache.delete(uniqueKey);
             } catch (Throwable ex) {

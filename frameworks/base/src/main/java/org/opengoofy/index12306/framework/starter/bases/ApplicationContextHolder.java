@@ -26,7 +26,9 @@ import java.util.Map;
 
 /**
  * Application context holder.
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+ * 用于非 Spring Bean 中使用到 Spring Bean
+ * 将 Spring IOC 容器的对象放到一个自定义容器中，并持有 Spring IOC 容器。
+ * 这样就可以通过自定义容器访问 Spring IOC 容器获取 Spring Bean。
  */
 public class ApplicationContextHolder implements ApplicationContextAware {
 

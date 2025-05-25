@@ -48,7 +48,6 @@ import java.util.Date;
  * 参考：http://www.cnblogs.com/relucent/p/4955340.html<br>
  * 关于长度是18还是19的问题见：https://blog.csdn.net/unifirst/article/details/80408050
  *
- * @author Looly
  * @since 3.0.1
  */
 public class Snowflake implements Serializable, IdGenerator {

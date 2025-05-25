@@ -29,7 +29,7 @@ import java.util.Optional;
 
 /**
  * 支付 ID 全局唯一生成器管理
- * 公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
+
  */
 @Component
 @RequiredArgsConstructor
@@ -49,6 +49,9 @@ public final class PayIdGeneratorManager implements InitializingBean {
         return DISTRIBUTED_ID_GENERATOR.generateId() + orderSn.substring(orderSn.length() - 6);
     }
 
+    /**
+     * 在 Spring 容器初始化该 bean 的所有属性后被调用
+     */
     @Override
     public void afterPropertiesSet() throws Exception {
         String LOCK_KEY = "distributed_pay_id_generator_lock_key";
